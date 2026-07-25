@@ -1,7 +1,7 @@
 // BEST RYAN service worker — network-first so updates land immediately,
 // cache fallback so the app opens with no signal.
-const CACHE = 'best-ryan-v1';
-const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
+const CACHE = 'best-ryan-v2';
+const ASSETS = ['./', './index.html', './manifest.json', './sunrise-192.png', './sunrise-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
