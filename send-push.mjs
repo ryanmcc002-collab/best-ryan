@@ -1,16 +1,15 @@
 // Sends the daily reminder to every subscription in subscriptions.json.
-// Runs from GitHub Actions on UTC crons that bracket Sydney time; this
-// script decides morning vs evening from actual Australia/Sydney clock
-// so daylight-saving changes never break the schedule.
+// Runs from GitHub Actions on UTC crons; this script decides morning vs
+// evening from the actual Asia/Ho_Chi_Minh clock (UTC+7, no DST).
 import webpush from 'web-push';
 import { readFileSync } from 'fs';
 
 const subs = JSON.parse(readFileSync('./subscriptions.json', 'utf8'));
 if (!subs.length) { console.log('no subscriptions yet'); process.exit(0); }
 
-const sydney = new Date().toLocaleString('en-AU', { timeZone: 'Australia/Sydney', hour12: false });
-const hour = Number(new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', hour: 'numeric', hour12: false }).format(new Date()));
-console.log('Sydney time:', sydney, '— hour', hour);
+const sydney = new Date().toLocaleString('en-AU', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });
+const hour = Number(new Intl.DateTimeFormat('en-AU', { timeZone: 'Asia/Ho_Chi_Minh', hour: 'numeric', hour12: false }).format(new Date()));
+console.log('Ho Chi Minh time:', sydney, '— hour', hour);
 
 const MORNING = [
   'Morning. Tap the pledge before the day gets loud.',
