@@ -26,7 +26,9 @@ const EVENING = [
 ];
 
 let body, tag;
-if (hour >= 5 && hour < 12) {
+if (process.env.FORCE_TEST === 'yes') {
+  body = 'Reminders are live. 7am pledge, 8:30pm check-in. No excuses left, mate.'; tag = 'test';
+} else if (hour >= 5 && hour < 12) {
   const doy = Math.floor(Date.now() / 86400000);
   body = MORNING[doy % MORNING.length]; tag = 'morning';
 } else if (hour >= 18 && hour < 23) {
