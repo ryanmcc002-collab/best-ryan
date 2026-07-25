@@ -184,6 +184,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
       <div class="daysub" id="daySub">days</div>
       <div class="money" id="whyLine"></div>
       <div class="small" id="lifetimeLine" style="margin-top:6px"></div>
+      <div id="oneThingLine" style="margin-top:8px;color:var(--orange-soft);font-weight:600"></div>
       <div class="progresswrap">
         <div class="progressmeta"><span id="msLabel"></span><span id="msLeft"></span></div>
         <div class="progressbar"><div id="msBar" style="width:0%"></div></div>
@@ -194,6 +195,22 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
       <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><path d="m2 16 6 6"/><circle cx="16" cy="9" r="2.9"/><circle cx="6" cy="5" r="3"/></svg>Morning pledge</h2>
       <button class="btn btn-orange" id="pledgeBtn">I will not drink today</button>
       <p class="savedmsg" id="pledgeMsg" style="margin-top:8px"></p>
+    </div>
+
+    <div class="card">
+      <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>This morning</h2>
+      <p id="affirmText" style="font-weight:600;font-size:1.02rem"></p>
+      <label class="f" for="oneThing">The one thing that matters today</label>
+      <input type="text" id="oneThing" maxlength="100" placeholder="One thing. Not five.">
+      <label class="f" for="journalInput" id="journalPrompt">Morning note</label>
+      <input type="text" id="journalInput" maxlength="160" placeholder="One honest line">
+      <button class="btn btn-teal" id="saveMorning" style="margin-top:14px">Lock in the morning</button>
+      <p class="savedmsg" id="morningMsg"></p>
+    </div>
+
+    <div class="card" id="planCard" style="display:none">
+      <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Today's plan <span style="color:var(--muted);font-size:.8rem;font-weight:400;text-transform:none">— set last night, no willpower needed</span></h2>
+      <div id="planLines"></div>
     </div>
 
     <div class="card">
@@ -405,7 +422,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <hr style="border-color:var(--border);margin:18px 0">
   <p class="small">Slipped and had a drink? No shame spiral — the count resets honestly and we go again. Never miss twice.</p>
   <button class="btn btn-red" id="resetBtn" style="margin-top:10px">I drank — reset the count</button>
-  <p class="small" style="margin-top:14px;text-align:center;color:var(--muted)">App version 1.6 — voice picker</p>
+  <p class="small" style="margin-top:14px;text-align:center;color:var(--muted)">App version 1.7 — morning flow</p>
 </div>
 </div>
 </div>
@@ -472,10 +489,34 @@ const QUOTES=[
 ["Hard choices, easy life. Easy choices, hard life.","Jerzy Gregorek"],
 ["You can't build a reputation on what you are going to do.","Henry Ford"]
 ];
+function dateSeed(){return parseInt(todayKey().replace(/-/g,''),10);}
 function todaysQuote(){
-  const idx=Math.floor(Date.now()/86400000)%QUOTES.length;
-  return QUOTES[idx];
+  return QUOTES[dateSeed()%QUOTES.length];
 }
+
+/* ===== affirmations — identity-based, no fake attributions ===== */
+const AFFIRM=[
+"I don't drink. That's not a rule — it's who I am now.",
+"Clear head, steady hands, fully present. That's the trade and I'm taking it.",
+"The urge is not an order.",
+"I show up for my family by showing up for myself first.",
+"One day, done well. That's the whole job.",
+"Calm is a skill and I train it daily.",
+"I do the hard thing first, and the day gets easier.",
+"My attention goes where I point it. Today I'm pointing it.",
+"Every craving I outlast makes the next one weaker.",
+"I'm not missing out on anything. I'm getting everything back."
+];
+const JPROMPTS=[
+"How's the head this morning? One honest line",
+"What would make today a win?",
+"One thing you're grateful for right now",
+"What might trip you up today — and what's the counter?",
+"What are you looking forward to today?",
+"Yesterday's lesson in one line",
+"Who needs the best of you today?"
+];
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 /* ===== YOUR BRAIN TODAY — education keyed to day count ===== */
 const BRAIN=[
@@ -530,6 +571,21 @@ function renderHome(){
   document.getElementById('lifetimeLine').textContent=(D.pastStreaks&&D.pastStreaks.length)?`${lt} days alcohol-free all-time — none of them wasted`:'';
   document.getElementById('brainText').textContent=brainToday();
   renderPledge();
+  // morning flow
+  document.getElementById('affirmText').textContent='“'+AFFIRM[dateSeed()%AFFIRM.length]+'”';
+  document.getElementById('journalPrompt').textContent=JPROMPTS[dateSeed()%JPROMPTS.length];
+  const td=D.days[todayKey()]||{};
+  document.getElementById('oneThing').value=td.oneThing||'';
+  document.getElementById('journalInput').value=td.journal||'';
+  document.getElementById('oneThingLine').textContent=td.oneThing?('Today: '+td.oneThing):'';
+  // today's plan (set last night)
+  const plan=D.plans[todayKey()]||{};
+  const lines=[['Training',plan.train],['Meditation',plan.med],['Dinner',plan.dinner]].filter(([,v])=>v);
+  const pc=document.getElementById('planCard');
+  if(lines.length){
+    pc.style.display='block';
+    document.getElementById('planLines').innerHTML=lines.map(([k,v])=>`<div style="margin-top:6px;font-size:.95rem"><strong style="color:var(--teal)">${k}:</strong> ${esc(v)}</div>`).join('');
+  }else{pc.style.display='none';}
   const next=MILESTONES.find(m=>m>showN)||showN+30;
   const prev=[...MILESTONES].reverse().find(m=>m<=showN)||0;
   const pct=Math.min(100,Math.round(((showN-prev)/(next-prev))*100));
@@ -562,6 +618,17 @@ document.getElementById('pledgeBtn').addEventListener('click',()=>{
   D.pledges[todayKey()]=true;save();renderPledge();
 });
 
+document.getElementById('saveMorning').addEventListener('click',()=>{
+  const key=todayKey();
+  D.days[key]=D.days[key]||{};
+  D.days[key].oneThing=document.getElementById('oneThing').value.trim();
+  D.days[key].journal=document.getElementById('journalInput').value.trim();
+  save();renderHome();
+  const m=document.getElementById('morningMsg');
+  m.textContent='Morning locked. Go get it.';
+  setTimeout(()=>{m.textContent='';},3000);
+});
+
 /* ================= CHECK-IN ================= */
 function renderCheckin(){
   const key=todayKey();
@@ -573,7 +640,8 @@ function renderCheckin(){
   });
   document.querySelectorAll('.mood').forEach(m=>m.classList.toggle('sel',t.mood==m.dataset.m));
   document.getElementById('winInput').value=t.win||'';
-  const plan=D.plans[key]||{};
+  const tm=new Date();tm.setDate(tm.getDate()+1);
+  const plan=D.plans[todayKey(tm)]||{};
   document.getElementById('planTrain').value=plan.train||'';
   document.getElementById('planMed').value=plan.med||'';
   document.getElementById('planDinner').value=plan.dinner||'';
@@ -596,7 +664,8 @@ document.getElementById('saveDay').addEventListener('click',()=>{
   if(sel)entry.mood=+sel.dataset.m;
   entry.win=document.getElementById('winInput').value.trim();
   D.days[key]=entry;
-  D.plans[key]={train:document.getElementById('planTrain').value.trim(),med:document.getElementById('planMed').value.trim(),dinner:document.getElementById('planDinner').value.trim()};
+  const tm=new Date();tm.setDate(tm.getDate()+1);
+  D.plans[todayKey(tm)]={train:document.getElementById('planTrain').value.trim(),med:document.getElementById('planMed').value.trim(),dinner:document.getElementById('planDinner').value.trim()};
   save();
   flash('Saved. Day banked. ✓');
   renderHome();
@@ -606,7 +675,7 @@ function flash(msg){
   setTimeout(()=>{el.textContent='';},3000);
 }
 document.getElementById('copyCard').addEventListener('click',()=>{
-  const key=todayKey();const t=D.days[key]||{};const n=dayCount();
+  const key=todayKey();const t=D.days[key]||{};const n=Math.max(dayCount(),0);
   const tick=v=>v?'✓':'✗';
   const next=MILESTONES.find(m=>m>n)||n+30;
   const card=
@@ -616,7 +685,8 @@ document.getElementById('copyCard').addEventListener('click',()=>{
 \u{1F3CB}️ Moved: ${tick(t.moved)}
 \u{1F9D8} Meditation: ${tick(t.meditated)}
 \u{1F357} Ate to standard: ${tick(t.ate)}
-Mood: ${t.mood?t.mood+'/5':'-'}${t.win?' — "'+t.win+'"':''}
+Main thing: ${t.oneThing||'-'}${t.oneThing?' '+tick(true):''}
+Mood: ${t.mood?t.mood+'/5':'-'}${t.win?' — "'+t.win+'"':''}${t.journal?'\nNote: "'+t.journal+'"':''}
 Next milestone: Day ${next}${D.rewards[next]?' → reward: '+D.rewards[next]:''}`;
   navigator.clipboard.writeText(card).then(()=>flash('Scorecard copied — paste it to your coach.')).catch(()=>flash('Copy failed — long-press to select instead.'));
 });
@@ -894,7 +964,9 @@ function renderHistory(){
     return `<div class="daycard">
       <div class="dhead"><span>${fmtDate(k)}</span><span class="mood-t">${t.mood?'Mood '+t.mood+'/5':''}</span></div>
       <div class="ticks">${tk(t.alcohol,'Alcohol-free')}${tk(t.moved,'Moved')}${tk(t.meditated,'Meditated')}${tk(t.ate,'Ate well')}</div>
-      ${t.win?`<div class="dwin">“${t.win}”</div>`:''}
+      ${t.oneThing?`<div class="dwin" style="font-style:normal">Main thing: ${esc(t.oneThing)}</div>`:''}
+      ${t.win?`<div class="dwin">Win: “${esc(t.win)}”</div>`:''}
+      ${t.journal?`<div class="dwin">“${esc(t.journal)}”</div>`:''}
     </div>`;
   }).join('')||'<p class="small" style="margin-top:16px;text-align:center">No days banked yet — save your first check-in.</p>';
 }
