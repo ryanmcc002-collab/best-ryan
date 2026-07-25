@@ -282,6 +282,10 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
         <button class="dur sel" data-audio="tones">Tones</button>
         <button class="dur" data-audio="voice">Voice + tones</button>
       </div>
+      <div id="voiceRow" style="display:none;margin-top:10px">
+        <label class="f" for="voiceSel" style="margin-top:0">Voice — pick one, it speaks a sample</label>
+        <select id="voiceSel"></select>
+      </div>
       <div class="breathe-stage">
         <div class="bcircle" id="bCircle" role="button" tabindex="0" aria-label="Start or stop breathing session" style="cursor:pointer"><span class="bphase" id="bPhase">Tap to start</span></div>
         <div class="btimer" id="bTimer">3:00</div>
@@ -401,7 +405,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <hr style="border-color:var(--border);margin:18px 0">
   <p class="small">Slipped and had a drink? No shame spiral — the count resets honestly and we go again. Never miss twice.</p>
   <button class="btn btn-red" id="resetBtn" style="margin-top:10px">I drank — reset the count</button>
-  <p class="small" style="margin-top:14px;text-align:center;color:var(--muted)">App version 1.5 — tap the circle, calmer voice</p>
+  <p class="small" style="margin-top:14px;text-align:center;color:var(--muted)">App version 1.6 — voice picker</p>
 </div>
 </div>
 </div>
@@ -644,25 +648,52 @@ function setCircle(scale,secs){
 let audioMode=D.audioMode||'tones',AC=null;
 const SPOKEN={'Breathe in':'Breathe in','Breathe out':'Breathe out, slowly','Breathe in (nose)':'Breathe in','Sip in more':'A little more in','Long exhale (mouth)':'And breathe out, slowly'};
 let chosenVoice=null;
+function voiceScore(v){
+  const prefs=['Karen','Catherine','Samantha','Serena','Moira','Tessa','Martha','Kate'];
+  let s=0;
+  const i=prefs.findIndex(p=>v.name.includes(p));
+  if(i>=0)s+=100-i*10;
+  if(/premium/i.test(v.name))s+=60;
+  if(/enhanced/i.test(v.name))s+=50;
+  if(/^en/i.test(v.lang))s+=3;
+  if(/en[-_]AU/i.test(v.lang))s+=5;
+  return s;
+}
 function pickVoice(){
   if(!('speechSynthesis'in window))return;
   const vs=speechSynthesis.getVoices();
   if(!vs.length)return;
-  const prefs=['Karen','Catherine','Samantha','Serena','Moira','Tessa','Martha','Kate'];
-  for(const p of prefs){
-    const v=vs.find(x=>x.name.includes(p));
-    if(v){chosenVoice=v;return;}
-  }
-  chosenVoice=vs.find(x=>/en[-_](AU|GB|US)/i.test(x.lang))||vs[0];
+  const enVs=vs.filter(v=>/^en/i.test(v.lang));
+  const list=enVs.length?enVs:vs;
+  const saved=D.voiceName&&list.find(v=>v.name===D.voiceName);
+  chosenVoice=saved||[...list].sort((a,b)=>voiceScore(b)-voiceScore(a))[0];
+  const sel=document.getElementById('voiceSel');
+  sel.innerHTML=[...list].sort((a,b)=>voiceScore(b)-voiceScore(a))
+    .map(v=>`<option value="${v.name.replace(/"/g,'&quot;')}"${chosenVoice&&v.name===chosenVoice.name?' selected':''}>${v.name} (${v.lang})</option>`).join('');
 }
 pickVoice();
 if('speechSynthesis'in window)speechSynthesis.onvoiceschanged=pickVoice;
+document.getElementById('voiceSel').addEventListener('change',()=>{
+  const name=document.getElementById('voiceSel').value;
+  const v=speechSynthesis.getVoices().find(x=>x.name===name);
+  if(v){chosenVoice=v;D.voiceName=name;save();
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance('Breathe in. And breathe out, slowly.');
+    u.voice=v;u.rate=0.72;u.pitch=1.0;
+    speechSynthesis.speak(u);
+  }
+});
+function syncVoiceRow(){
+  document.getElementById('voiceRow').style.display=(audioMode==='voice'&&'speechSynthesis'in window)?'block':'none';
+}
 document.querySelectorAll('#audioRow .dur').forEach(b=>b.classList.toggle('sel',b.dataset.audio===audioMode));
 document.getElementById('audioRow').addEventListener('click',e=>{
   const b=e.target.closest('.dur');if(!b)return;
   document.querySelectorAll('#audioRow .dur').forEach(x=>x.classList.remove('sel'));
   b.classList.add('sel');audioMode=b.dataset.audio;D.audioMode=audioMode;save();
+  syncVoiceRow();
 });
+syncVoiceRow();
 function ensureAC(){
   if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();
   if(AC.state==='suspended')AC.resume();
