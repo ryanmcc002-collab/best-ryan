@@ -22,6 +22,7 @@ const EVENING = [
   'Bank the day before bed — 2 minutes, done.',
   'How’d you go? The scorecard wants the truth.',
   'Close the loop: check in, plan tomorrow, lights out.',
+  'Write tomorrow’s list before bed — future you wakes up with orders.',
 ];
 
 let body, tag;
