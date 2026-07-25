@@ -379,6 +379,16 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
     <button class="btn btn-ghost" id="setClose">Close</button>
   </div>
   <hr style="border-color:var(--border);margin:18px 0">
+  <h2 style="font-size:1.1rem;margin-bottom:8px">Reminders</h2>
+  <p class="small">Morning pledge nudge (7am) and evening check-in (8:30pm), straight to your lock screen.</p>
+  <button class="btn btn-teal" id="notifyBtn" style="margin-top:10px">Enable reminders</button>
+  <div id="subBox" style="display:none;margin-top:10px">
+    <p class="small" style="color:var(--green)">Almost there — copy this code and paste it to your coach to switch the reminders on:</p>
+    <textarea id="subJson" rows="4" readonly style="font-size:.75rem;margin-top:8px"></textarea>
+    <button class="btn btn-ghost" id="subCopy" style="margin-top:8px">Copy code</button>
+  </div>
+  <p class="small" id="notifyMsg" style="margin-top:8px"></p>
+  <hr style="border-color:var(--border);margin:18px 0">
   <p class="small">Slipped and had a drink? No shame spiral — the count resets honestly and we go again. Never miss twice.</p>
   <button class="btn btn-red" id="resetBtn" style="margin-top:10px">I drank — reset the count</button>
 </dialog>
@@ -799,6 +809,39 @@ document.getElementById('resetBtn').addEventListener('click',()=>{
   const key=todayKey();D.days[key]=D.days[key]||{};D.days[key].alcohol=false;
   save();dlg.close();renderHome();
   alert(`Welcome back. Those ${banked} days are banked forever — ${lifetimeDays()} alcohol-free days all-time, and a lapse doesn't delete one of them. Most people who make it slip at least once; the ones who don't make it slip twice. Tomorrow is Day 1.`);
+});
+
+/* ================= PUSH REMINDERS ================= */
+const VAPID_PUBLIC='BJLNly7ZfSvzLNnkCIRa3AFqnOpB8OtMoJBH24r2RibAfqes38vCCZPAQth4FJv7lSSYmOob_8J385WWLS1mivQ';
+function b64ToUint8(s){
+  const pad='='.repeat((4-s.length%4)%4);
+  const raw=atob((s+pad).replace(/-/g,'+').replace(/_/g,'/'));
+  return Uint8Array.from(raw,c=>c.charCodeAt(0));
+}
+document.getElementById('notifyBtn').addEventListener('click',async()=>{
+  const msg=document.getElementById('notifyMsg');
+  const standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+  if(!('Notification'in window)||!('PushManager'in window)){
+    msg.textContent=standalone?'This phone doesn’t support web push (needs iOS 16.4 or newer).':'Open this from the BEST RYAN icon on your home screen, then try again — iPhone only allows notifications for installed apps.';
+    return;
+  }
+  if(!standalone&&/iPhone|iPad/.test(navigator.userAgent)){
+    msg.textContent='Open the app from its home-screen icon first — iPhone only allows notifications for installed apps.';
+    return;
+  }
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){msg.textContent='Notifications were declined — you can allow them in iPhone Settings → BEST RYAN.';return;}
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToUint8(VAPID_PUBLIC)});
+    document.getElementById('subJson').value=JSON.stringify(sub.toJSON());
+    document.getElementById('subBox').style.display='block';
+    msg.textContent='';
+  }catch(e){msg.textContent='Couldn’t subscribe: '+e.message;}
+});
+document.getElementById('subCopy').addEventListener('click',()=>{
+  const t=document.getElementById('subJson');
+  navigator.clipboard.writeText(t.value).then(()=>{document.getElementById('subCopy').textContent='Copied ✓';});
 });
 
 /* ================= INIT ================= */

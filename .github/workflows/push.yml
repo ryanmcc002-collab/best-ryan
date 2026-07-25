@@ -1,0 +1,25 @@
+name: Send reminders
+
+on:
+  schedule:
+    # Sydney 7:00am — 21:00 UTC (AEST) / 20:00 UTC (AEDT)
+    - cron: '0 21 * * *'
+    - cron: '0 20 * * *'
+    # Sydney 8:30pm — 10:30 UTC (AEST) / 9:30 UTC (AEDT)
+    - cron: '30 10 * * *'
+    - cron: '30 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install web-push --no-save
+      - run: node send-push.mjs
+        env:
+          VAPID_PUBLIC_KEY: BJLNly7ZfSvzLNnkCIRa3AFqnOpB8OtMoJBH24r2RibAfqes38vCCZPAQth4FJv7lSSYmOob_8J385WWLS1mivQ
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}

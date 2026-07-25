@@ -14,6 +14,25 @@ self.addEventListener('activate', e => {
   );
 });
 
+self.addEventListener('push', e => {
+  let data = { title: 'BEST RYAN', body: 'Check in.' };
+  try { data = e.data.json(); } catch (err) {}
+  e.waitUntil(self.registration.showNotification(data.title, {
+    body: data.body,
+    icon: './sunrise-192.png',
+    badge: './sunrise-192.png',
+    tag: data.tag || 'best-ryan'
+  }));
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    for (const c of list) { if ('focus' in c) return c.focus(); }
+    return clients.openWindow('./');
+  }));
+});
+
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
