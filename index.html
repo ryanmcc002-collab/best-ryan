@@ -277,6 +277,11 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
         <button class="dur" data-mode="sigh">Cyclic sigh</button>
       </div>
       <p class="small" id="modeDesc" style="margin-top:8px;text-align:center">Steady calm — meditation reps for the ADHD brain.</p>
+      <div class="durrow" id="audioRow" style="margin-top:10px">
+        <button class="dur" data-audio="off">Silent</button>
+        <button class="dur sel" data-audio="tones">Tones</button>
+        <button class="dur" data-audio="voice">Voice + tones</button>
+      </div>
       <div class="breathe-stage">
         <div class="bcircle" id="bCircle"><span class="bphase" id="bPhase">Ready</span></div>
         <div class="btimer" id="bTimer">3:00</div>
@@ -396,7 +401,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <hr style="border-color:var(--border);margin:18px 0">
   <p class="small">Slipped and had a drink? No shame spiral — the count resets honestly and we go again. Never miss twice.</p>
   <button class="btn btn-red" id="resetBtn" style="margin-top:10px">I drank — reset the count</button>
-  <p class="small" style="margin-top:14px;text-align:center;color:var(--muted)">App version 1.3 — reminders</p>
+  <p class="small" style="margin-top:14px;text-align:center;color:var(--muted)">App version 1.4 — meditation audio</p>
 </div>
 </div>
 </div>
@@ -634,6 +639,53 @@ function setCircle(scale,secs){
   bCircle.style.transition=`transform ${secs}s ease-in-out`;
   bCircle.style.transform=`scale(${scale})`;
 }
+
+/* ===== audio engine — all synthesized on-device, works offline ===== */
+let audioMode=D.audioMode||'tones',AC=null;
+const SPOKEN={'Breathe in':'In','Breathe out':'Out','Breathe in (nose)':'In','Sip in more':'A little more','Long exhale (mouth)':'Out, slowly'};
+document.querySelectorAll('#audioRow .dur').forEach(b=>b.classList.toggle('sel',b.dataset.audio===audioMode));
+document.getElementById('audioRow').addEventListener('click',e=>{
+  const b=e.target.closest('.dur');if(!b)return;
+  document.querySelectorAll('#audioRow .dur').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel');audioMode=b.dataset.audio;D.audioMode=audioMode;save();
+});
+function ensureAC(){
+  if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();
+  if(AC.state==='suspended')AC.resume();
+}
+function bell(times){
+  if(audioMode==='off')return;ensureAC();
+  for(let i=0;i<times;i++){
+    const t=AC.currentTime+0.05+i*0.9;
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.type='sine';o.frequency.value=660;
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.22,t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+1.4);
+    o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+1.5);
+  }
+}
+function phaseTone(label,ms){
+  if(audioMode==='off')return;ensureAC();
+  const exhale=/out|exhale/i.test(label);
+  const t=AC.currentTime,dur=ms/1000;
+  const o=AC.createOscillator(),g=AC.createGain();
+  o.type='sine';
+  o.frequency.setValueAtTime(exhale?260:170,t);
+  o.frequency.linearRampToValueAtTime(exhale?170:260,t+dur);
+  const ramp=Math.min(0.6,dur/4);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(0.09,t+ramp);
+  g.gain.setValueAtTime(0.09,t+dur-ramp);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+dur+0.05);
+}
+function speak(text){
+  if(audioMode!=='voice'||!('speechSynthesis'in window))return;
+  const u=new SpeechSynthesisUtterance(text);
+  u.rate=0.75;u.pitch=0.9;u.volume=0.9;
+  speechSynthesis.speak(u);
+}
 document.getElementById('modeRow').addEventListener('click',e=>{
   const b=e.target.closest('.dur');if(!b||bRunning)return;
   document.querySelectorAll('#modeRow .dur').forEach(x=>x.classList.remove('sel'));
@@ -646,12 +698,15 @@ function breatheCycle(i=0){
   const [label,scale,ms]=ph[i%ph.length];
   bPhase.textContent=label;
   setCircle(scale,ms/1000);
+  phaseTone(label,ms);
+  speak(SPOKEN[label]||label);
   bPhaseTimer=setTimeout(()=>breatheCycle(i+1),ms);
 }
 bStartBtn.addEventListener('click',()=>{
   if(bRunning){stopBreathe(false);return;}
   bRunning=true;bLeft=bDur;drawBTimer();
   bStartBtn.textContent='Stop';bStartBtn.classList.remove('btn-teal');bStartBtn.classList.add('btn-ghost');
+  bell(1);
   breatheCycle();
   bTick=setInterval(()=>{
     bLeft--;drawBTimer();
@@ -660,10 +715,13 @@ bStartBtn.addEventListener('click',()=>{
 });
 function stopBreathe(finished){
   bRunning=false;clearInterval(bTick);clearTimeout(bPhaseTimer);
+  if('speechSynthesis'in window)speechSynthesis.cancel();
   bCircle.style.transition='transform 1s ease-in-out';bCircle.style.transform='scale(.72)';
   bStartBtn.textContent='Start';bStartBtn.classList.add('btn-teal');bStartBtn.classList.remove('btn-ghost');
   if(finished){
     bPhase.textContent='Done';
+    bell(2);
+    setTimeout(()=>speak('Done. Well done.'),300);
     const key=todayKey();D.days[key]=D.days[key]||{};D.days[key].meditated=true;save();
     setTimeout(()=>{bPhase.textContent='Ready';},2500);
   }else{
