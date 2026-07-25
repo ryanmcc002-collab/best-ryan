@@ -367,9 +367,14 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   </div>
 </div>
 
-<!-- ============ SETTINGS DIALOG ============ -->
-<dialog id="settingsDlg">
-  <h2 style="font-size:1.3rem;margin-bottom:14px">Settings</h2>
+<!-- ============ SETTINGS OVERLAY ============ -->
+<div class="overlay" id="settingsDlg" role="dialog" aria-modal="true" aria-label="Settings">
+<div class="wrap">
+<div class="card" style="margin-top:4px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <h2 style="font-size:1.3rem">Settings</h2>
+    <button class="iconbtn" id="setX" aria-label="Close settings"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+  </div>
   <label class="f" for="setStart">Day 1 (first alcohol-free day)</label>
   <input type="date" id="setStart">
   <label class="f" for="setWhys">Your reasons (one per line)</label>
@@ -391,8 +396,10 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <hr style="border-color:var(--border);margin:18px 0">
   <p class="small">Slipped and had a drink? No shame spiral — the count resets honestly and we go again. Never miss twice.</p>
   <button class="btn btn-red" id="resetBtn" style="margin-top:10px">I drank — reset the count</button>
-  <p class="small" style="margin-top:14px;text-align:center;color:var(--muted)">App version 1.2 — reminders</p>
-</dialog>
+  <p class="small" style="margin-top:14px;text-align:center;color:var(--muted)">App version 1.3 — reminders</p>
+</div>
+</div>
+</div>
 
 <nav>
   <div class="navin">
@@ -790,16 +797,18 @@ const dlg=document.getElementById('settingsDlg');
 document.getElementById('settingsBtn').addEventListener('click',()=>{
   document.getElementById('setStart').value=D.startDate;
   document.getElementById('setWhys').value=(D.whys&&D.whys.length?D.whys:defaults.whys).join('\n');
-  dlg.showModal();
+  dlg.classList.add('active');
 });
+function closeDlg(){dlg.classList.remove('active');}
+document.getElementById('setX').addEventListener('click',closeDlg);
 document.getElementById('setSave').addEventListener('click',()=>{
   const sd=document.getElementById('setStart').value;
   if(sd)D.startDate=sd;
   const whys=document.getElementById('setWhys').value.split('\n').map(s=>s.trim()).filter(Boolean);
   if(whys.length)D.whys=whys;
-  save();dlg.close();renderHome();
+  save();closeDlg();renderHome();
 });
-document.getElementById('setClose').addEventListener('click',()=>dlg.close());
+document.getElementById('setClose').addEventListener('click',closeDlg);
 document.getElementById('resetBtn').addEventListener('click',()=>{
   if(!confirm('Reset the alcohol-free count? Honest resets only — then straight back to work.'))return;
   const banked=Math.max(dayCount(),0);
@@ -808,7 +817,7 @@ document.getElementById('resetBtn').addEventListener('click',()=>{
   const t=new Date();t.setDate(t.getDate()+1);
   D.startDate=todayKey(t); // tomorrow becomes Day 1
   const key=todayKey();D.days[key]=D.days[key]||{};D.days[key].alcohol=false;
-  save();dlg.close();renderHome();
+  save();closeDlg();renderHome();
   alert(`Welcome back. Those ${banked} days are banked forever — ${lifetimeDays()} alcohol-free days all-time, and a lapse doesn't delete one of them. Most people who make it slip at least once; the ones who don't make it slip twice. Tomorrow is Day 1.`);
 });
 
