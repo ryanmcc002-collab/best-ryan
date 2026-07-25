@@ -2,8 +2,8 @@ name: Send reminders
 
 on:
   schedule:
-    # Ho Chi Minh 7:00am — 00:00 UTC (ICT is UTC+7, no DST)
-    - cron: '0 0 * * *'
+    # Ho Chi Minh 6:00am — 23:00 UTC previous day (ICT is UTC+7, no DST)
+    - cron: '0 23 * * *'
     # Ho Chi Minh 8:30pm — 13:30 UTC
     - cron: '30 13 * * *'
   workflow_dispatch:
