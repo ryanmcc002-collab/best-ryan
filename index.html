@@ -391,6 +391,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <hr style="border-color:var(--border);margin:18px 0">
   <p class="small">Slipped and had a drink? No shame spiral — the count resets honestly and we go again. Never miss twice.</p>
   <button class="btn btn-red" id="resetBtn" style="margin-top:10px">I drank — reset the count</button>
+  <p class="small" style="margin-top:14px;text-align:center;color:var(--muted)">App version 1.2 — reminders</p>
 </dialog>
 
 <nav>
@@ -847,7 +848,11 @@ document.getElementById('subCopy').addEventListener('click',()=>{
 /* ================= INIT ================= */
 renderHome();
 if('serviceWorker' in navigator&&location.protocol!=='file:'){
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
+  navigator.serviceWorker.register('sw.js').then(reg=>reg.update()).catch(()=>{});
+  let reloaded=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(reloaded)return;reloaded=true;location.reload();
+  });
 }
 </script>
 </body>
