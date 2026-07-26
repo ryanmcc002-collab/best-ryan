@@ -2,10 +2,15 @@ name: Send reminders
 
 on:
   schedule:
-    # Ho Chi Minh 6:00am — 23:00 UTC previous day (ICT is UTC+7, no DST)
-    - cron: '0 23 * * *'
-    # Ho Chi Minh 8:30pm — 13:30 UTC
-    - cron: '30 13 * * *'
+    # GitHub cron runs late or drops on busy minutes (:00/:30), so fire
+    # slightly early on odd minutes, with a backup ~40 min later. The
+    # script's time-window check + notification tag dedupe handle overlap.
+    # Morning ~6:00am Ho Chi Minh (ICT = UTC+7, no DST)
+    - cron: '37 22 * * *'
+    - cron: '17 23 * * *'
+    # Evening ~8:30pm Ho Chi Minh
+    - cron: '7 13 * * *'
+    - cron: '47 13 * * *'
   workflow_dispatch:
     inputs:
       test:

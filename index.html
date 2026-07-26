@@ -338,7 +338,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
           <button class="dur" data-d="10">10 min</button>
         </div>
       </div>
-      <p class="hint">Mind will wander — that's not failing, that's the rep. Notice it, come back to the breath. Best done straight after training.</p>
+      <p class="hint">Mind will wander — that's not failing, that's the rep. Notice it, come back to the breath. Best done straight after training. Screen stays awake during a session — just set the phone down.</p>
     </div>
   </section>
 
@@ -458,7 +458,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   <hr style="border-color:var(--border);margin:18px 0">
   <p class="small">Slipped and had a drink? No shame spiral — the count resets honestly and we go again. Never miss twice.</p>
   <button class="btn btn-red" id="resetBtn" style="margin-top:10px">I drank — reset the count</button>
-  <p class="small" style="margin-top:14px;text-align:center;color:var(--muted)">App version 2.0 — juice</p>
+  <p class="small" style="margin-top:14px;text-align:center;color:var(--muted)">App version 2.1 — wake lock + reliable reminders</p>
 </div>
 </div>
 </div>
@@ -609,6 +609,17 @@ function dopaSpin(){
 }
 document.getElementById('dopaBtn').addEventListener('click',dopaSpin);
 document.getElementById('dopaSos').addEventListener('click',dopaSpin);
+/* keep the screen awake during breathing + SOS so audio and timers survive */
+let wakeLock=null;
+async function acquireWake(){
+  try{if('wakeLock'in navigator)wakeLock=await navigator.wakeLock.request('screen');}catch(e){}
+}
+function releaseWake(){
+  if(wakeLock){wakeLock.release().catch(()=>{});wakeLock=null;}
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&(bRunning||sosOverlay.classList.contains('active')))acquireWake();
+});
 function updateBadge(){
   if(!('setAppBadge'in navigator))return;
   const t=D.days[todayKey()]||{};
@@ -1003,6 +1014,7 @@ function breatheCycle(i=0){
 function toggleBreathe(){
   if(bRunning){stopBreathe(false);return;}
   bRunning=true;bLeft=bDur;drawBTimer();
+  acquireWake();
   bell(1);
   breatheCycle();
   bTick=setInterval(()=>{
@@ -1014,6 +1026,7 @@ bCircle.addEventListener('click',toggleBreathe);
 bCircle.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggleBreathe();}});
 function stopBreathe(finished){
   bRunning=false;clearInterval(bTick);clearTimeout(bPhaseTimer);
+  releaseWake();
   if('speechSynthesis'in window)speechSynthesis.cancel();
   bCircle.style.transition='transform 1s ease-in-out';bCircle.style.transform='scale(.72)';
   if(finished){
@@ -1057,11 +1070,12 @@ document.getElementById('sosBtn').addEventListener('click',()=>{
   document.querySelectorAll('#rateRow .mood').forEach(m=>m.classList.remove('sel'));
   document.querySelectorAll('#haltRow button').forEach(x=>x.classList.remove('sel'));
   sosLeft=20*60;drawSos();
+  acquireWake();
   clearInterval(sosTick);
   sosTick=setInterval(()=>{sosLeft--;drawSos();if(sosLeft<=0){clearInterval(sosTick);document.getElementById('sosTimer').textContent='Passed ✓';}},1000);
 });
 function drawSos(){const m=Math.floor(sosLeft/60),s=String(sosLeft%60).padStart(2,'0');document.getElementById('sosTimer').textContent=`${m}:${s}`;}
-function closeSos(){sosOverlay.classList.remove('active');clearInterval(sosTick);}
+function closeSos(){sosOverlay.classList.remove('active');clearInterval(sosTick);releaseWake();}
 function finishCraving(){
   D.cravings=D.cravings||[];
   D.cravings.push(curCraving);save();
