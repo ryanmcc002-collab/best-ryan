@@ -1,15 +1,13 @@
-// Sends the daily reminder to every subscription in subscriptions.json.
-// Runs from GitHub Actions on UTC crons; this script decides morning vs
-// evening from the actual Asia/Ho_Chi_Minh clock (UTC+7, no DST).
+// Sends the daily reminders at exactly 6:00am / 8:30pm Ho Chi Minh time.
+// GitHub cron starts us early (it runs late and sometimes drops runs), then
+// this script sleeps until the precise target before sending. A later
+// fallback cron re-runs it; the fallback checks whether an earlier run
+// already handled the slot and skips if so.
 import webpush from 'web-push';
 import { readFileSync } from 'fs';
 
 const subs = JSON.parse(readFileSync('./subscriptions.json', 'utf8'));
 if (!subs.length) { console.log('no subscriptions yet'); process.exit(0); }
-
-const sydney = new Date().toLocaleString('en-AU', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });
-const hour = Number(new Intl.DateTimeFormat('en-AU', { timeZone: 'Asia/Ho_Chi_Minh', hour: 'numeric', hour12: false }).format(new Date()));
-console.log('Ho Chi Minh time:', sydney, '— hour', hour);
 
 const MORNING = [
   'Morning. Tap the pledge before the day gets loud.',
@@ -25,18 +23,53 @@ const EVENING = [
   'Write tomorrow’s list before bed — future you wakes up with orders.',
 ];
 
-let body, tag;
+const now = new Date();
+const utcH = now.getUTCHours();
+
+function todayUTC(h, m) { const d = new Date(now); d.setUTCHours(h, m, 0, 0); return d; }
+
+let slot = null, target = null;
 if (process.env.FORCE_TEST === 'yes') {
-  body = 'Reminders are live. 7am pledge, 8:30pm check-in. No excuses left, mate.'; tag = 'test';
-} else if (hour >= 5 && hour < 12) {
-  const doy = Math.floor(Date.now() / 86400000);
-  body = MORNING[doy % MORNING.length]; tag = 'morning';
-} else if (hour >= 18 && hour < 23) {
-  const doy = Math.floor(Date.now() / 86400000);
-  body = EVENING[doy % EVENING.length]; tag = 'evening';
+  slot = 'test'; target = now;
+} else if (utcH >= 21 && utcH <= 23) {          // morning window: 6:00am HCM = 23:00 UTC
+  slot = 'morning'; target = todayUTC(23, 0);
+} else if (utcH >= 12 && utcH <= 14) {          // evening window: 8:30pm HCM = 13:30 UTC
+  slot = 'evening'; target = todayUTC(13, 30);
 } else {
   console.log('outside reminder windows, skipping'); process.exit(0);
 }
+
+const isFallback = now.getTime() > target.getTime() + 60000;
+
+// Fallback runs only fire if no earlier scheduled run handled this slot.
+if (isFallback && slot !== 'test') {
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/actions/runs?event=schedule&per_page=10`,
+      { headers: { authorization: `Bearer ${process.env.GH_TOKEN}`, accept: 'application/vnd.github+json' } });
+    const j = await res.json();
+    const cutoff = Date.now() - 110 * 60 * 1000;
+    const handled = (j.workflow_runs || []).some(r =>
+      String(r.id) !== process.env.GITHUB_RUN_ID &&
+      new Date(r.created_at).getTime() > cutoff &&
+      (r.status === 'in_progress' || r.conclusion === 'success'));
+    if (handled) { console.log('primary run handled this slot — skipping fallback'); process.exit(0); }
+    console.log('primary run missing — fallback sending now');
+  } catch (e) { console.log('dedupe check failed, sending anyway:', e.message); }
+}
+
+// Sleep until the exact target time (public repo = free runner minutes).
+const waitMs = target.getTime() - Date.now();
+if (waitMs > 0) {
+  console.log(`sleeping ${Math.round(waitMs / 60000)} min until exact send time…`);
+  await new Promise(r => setTimeout(r, waitMs));
+}
+
+const doy = Math.floor(Date.now() / 86400000);
+let body, tag;
+if (slot === 'test') { body = 'Test: reminders are live and on time. No excuses left, mate.'; tag = 'test'; }
+else if (slot === 'morning') { body = MORNING[doy % MORNING.length]; tag = 'morning'; }
+else { body = EVENING[doy % EVENING.length]; tag = 'evening'; }
 
 webpush.setVapidDetails('mailto:ryan@bondifoodtrailers.com.au',
   process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
@@ -45,7 +78,7 @@ const payload = JSON.stringify({ title: 'BEST RYAN', body, tag });
 for (const sub of subs) {
   try {
     await webpush.sendNotification(sub, payload);
-    console.log('sent', tag, 'to', sub.endpoint.slice(0, 40) + '…');
+    console.log('sent', tag, 'at', new Date().toISOString());
   } catch (e) {
     console.log('failed (' + e.statusCode + '):', sub.endpoint.slice(0, 40) + '…');
   }
